@@ -194,7 +194,7 @@ QGroupBox {
                 <string>Skip 1D</string>
                </property>
                <property name="checked">
-                <bool>false</bool>
+                <bool>true</bool>
                </property>
               </widget>
              </item>
@@ -1549,7 +1549,7 @@ border-radius :15px;
      <x>0</x>
      <y>0</y>
      <width>1332</width>
-     <height>20</height>
+     <height>30</height>
     </rect>
    </property>
   </widget>
