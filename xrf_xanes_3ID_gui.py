@@ -1404,7 +1404,7 @@ class Loadh5AndFit(QThread):
             print(f"Batch fitting from {self.paramDict['sidList'][0]} to {self.paramDict['sidList'][-1]} is done")
         
 
-        except Exception as e: print("Error: "+e)
+        except Exception as e: print("Error: "+str(e))
 
         # for sid in self.paramDict["sidList"]:
         #     h5_present = os.path.exists(os.path.join(self.paramDict["wd"],f"scan2D_{sid}.h5"))
