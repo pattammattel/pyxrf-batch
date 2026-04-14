@@ -1134,7 +1134,7 @@ class Loadh5AndFitFromList(QThread):
                                     wd = self.paramDict["wd"],
                                     file_overwrite_existing = False,
                                     create_each_det = True,
-                                    skip_scan_types = ['FlyPlan1D', '1D_FLY_PANDA']
+                                    skip_scan_types = self.paramDict.get("skip_scan_types", [])
                                     )
                             
                         except:
@@ -1236,7 +1236,7 @@ class Loadh5AndFitFromListLive(QThread):
                                     wd = self.paramDict["wd"],
                                     file_overwrite_existing = True,
                                     create_each_det = True,
-                                    skip_scan_types = ['FlyPlan1D','1D_FLY_PANDA']
+                                    skip_scan_types = self.paramDict.get("skip_scan_types", [])
                                     )
                             
                         except: 
@@ -1339,7 +1339,7 @@ def xrf_load_and_fit_from_list(sid_list, param_dict):
                     wd = param_dict["wd"],
                     file_overwrite_existing = param_dict['file_overwrite_existing'],
                     create_each_det = True,
-                    skip_scan_types = ['FlyPlan1D','1D_FLY_PANDA']
+                    skip_scan_types = param_dict.get("skip_scan_types", [])
                     )
             
             QtTest.QTest.qWait(1000)
@@ -1386,15 +1386,14 @@ class Loadh5AndFit(QThread):
             try:
                 hdr = db[int(sid)]
                 start_doc = hdr["start"]
-                if not start_doc["plan_type"] in ("FlyPlan1D",):
-                    print(f"Loading h5 data of {sid = }")
+                print(f"Loading h5 data of {sid = }, plan_type: {start_doc['plan_type']}")
 
                 make_hdf(
                     int(sid), 
                     wd = self.paramDict["wd"],
                     file_overwrite_existing = self.paramDict['file_overwrite_existing'],
                     create_each_det = True,
-                    skip_scan_types = ['FlyPlan1D','1D_FLY_PANDA']
+                    skip_scan_types = self.paramDict.get("skip_scan_types", [])
                     )
                 
                 print(f"Pyxrf h5 for {sid = } is created ")
