@@ -303,6 +303,10 @@ class xrf_3ID(QtWidgets.QMainWindow):
         self.pte_status.append(f"scans to process {all_sid}")
         QtTest.QTest.qWait(500)
 
+        skip_1d = self.rb_skip1d.isChecked()
+        if skip_1d:
+            print("Skipping 1D scans (FlyPlan1D, 1D_FLY_PANDA)")
+
         h5Param = {'sidList':all_sid,
                    'wd':cwd,
                    'file_overwrite_existing':self.rb_h5OverWrite.isChecked(),
@@ -312,7 +316,8 @@ class xrf_3ID(QtWidgets.QMainWindow):
                     "XRFfit":self.rb_xrf_fit.isChecked(),
                     "quant_calib_file":self.le_quant_calib_file.text(),
                     "quant_calib_elem":self.le_qunat_ref_elem.text(),
-                    "interpolate_to_uniform_grid":self.rb_inter_uni_grid.isChecked()
+                    "interpolate_to_uniform_grid":self.rb_inter_uni_grid.isChecked(),
+                    "skip_scan_types": ['FlyPlan1D','1D_FLY_PANDA'] if skip_1d else []
                   }
 
 
@@ -330,7 +335,8 @@ class xrf_3ID(QtWidgets.QMainWindow):
                                      "saveXRFTiff": self.rb_saveXRFTiff.isChecked(),
                                      "quant_calib_file":self.le_quant_calib_file.text(),
                                      "quant_calib_elem":self.le_qunat_ref_elem.text(),
-                                     "interpolate_to_uniform_grid":self.rb_inter_uni_grid.isChecked()}
+                                     "interpolate_to_uniform_grid":self.rb_inter_uni_grid.isChecked(),
+                                     "skip_scan_types": ['FlyPlan1D','1D_FLY_PANDA'] if skip_1d else []}
             
             self.pyxrfBatchThread = xrfBatchThread(xrf_batch_param_dict)
             self.pyxrfBatchThread.start()
@@ -674,6 +680,9 @@ class xrf_3ID(QtWidgets.QMainWindow):
         # param = "/data/users/current_user/xrf/pyxrf_model_parameters_301387.json"
         
         norm = self.le_sclr_2.text()
+        skip_1d = self.rb_skip1d.isChecked()
+        if skip_1d:
+            print("Live mode: Skipping 1D scans (FlyPlan1D, 1D_FLY_PANDA)")
 
         h5Param = {'sidList':sid_list,
             'wd':cwd,
@@ -682,7 +691,8 @@ class xrf_3ID(QtWidgets.QMainWindow):
             "norm" :norm,
             "saveXRFTiff": self.rb_saveXRFTiff.isChecked(),
             "XRFfit":self.rb_xrf_fit.isChecked(),
-            "interpolate_grid":self.rb_inter_uni_grid.isChecked()
+            "interpolate_grid":self.rb_inter_uni_grid.isChecked(),
+            "skip_scan_types": ['FlyPlan1D','1D_FLY_PANDA'] if skip_1d else []
             }
             
         #self.xrf_batch_thread = Loadh5AndFit(h5Param)
@@ -708,6 +718,9 @@ class xrf_3ID(QtWidgets.QMainWindow):
         
         cwd = self.le_wd.text()
         norm = self.le_sclr_2.text()
+        skip_1d = self.rb_skip1d.isChecked()
+        if skip_1d:
+            print("Live batch mode: Skipping 1D scans (FlyPlan1D, 1D_FLY_PANDA)")
 
         h5Param = {'sidList':sid_list,
             'wd':cwd,
@@ -716,7 +729,8 @@ class xrf_3ID(QtWidgets.QMainWindow):
             "norm" :norm,
             "saveXRFTiff": self.rb_saveXRFTiff.isChecked(),
             "XRFfit":self.rb_xrf_fit.isChecked(),
-            "interpolate_to_uniform_grid":self.rb_inter_uni_grid.isChecked()
+            "interpolate_to_uniform_grid":self.rb_inter_uni_grid.isChecked(),
+            "skip_scan_types": ['FlyPlan1D','1D_FLY_PANDA'] if skip_1d else []
             }
             
         #self.xrf_batch_thread = Loadh5AndFit(h5Param)
@@ -762,6 +776,9 @@ class xrf_3ID(QtWidgets.QMainWindow):
         
         cwd = self.le_wd.text()
         norm = self.le_sclr_2.text()
+        skip_1d = self.rb_skip1d.isChecked()
+        if skip_1d:
+            print("Track file mode: Skipping 1D scans (FlyPlan1D, 1D_FLY_PANDA)")
 
         h5Param = {'sidList':sid_list,
             'wd':cwd,
@@ -770,7 +787,8 @@ class xrf_3ID(QtWidgets.QMainWindow):
             "norm" :norm,
             "saveXRFTiff": self.rb_saveXRFTiff.isChecked(),
             "XRFfit":self.rb_xrf_fit.isChecked(),
-            "interpolate_to_uniform_grid":self.rb_inter_uni_grid.isChecked()
+            "interpolate_to_uniform_grid":self.rb_inter_uni_grid.isChecked(),
+            "skip_scan_types": ['FlyPlan1D','1D_FLY_PANDA'] if skip_1d else []
             }
             
         #self.xrf_batch_thread = Loadh5AndFit(h5Param)
@@ -828,6 +846,9 @@ class xrf_3ID(QtWidgets.QMainWindow):
         
         cwd = self.le_wd.text()
         norm = self.le_sclr_2.text()
+        skip_1d = self.rb_skip1d.isChecked()
+        if skip_1d:
+            print("Live collector mode: Skipping 1D scans (FlyPlan1D, 1D_FLY_PANDA)")
 
         h5Param = {'sidList':sid_list,
             'wd':cwd,
@@ -836,7 +857,8 @@ class xrf_3ID(QtWidgets.QMainWindow):
             "norm" :norm,
             "saveXRFTiff": self.rb_saveXRFTiff.isChecked(),
             "XRFfit":self.rb_xrf_fit.isChecked(),
-            "interpolate_to_uniform_grid":self.rb_inter_uni_grid.isChecked()
+            "interpolate_to_uniform_grid":self.rb_inter_uni_grid.isChecked(),
+            "skip_scan_types": ['FlyPlan1D','1D_FLY_PANDA'] if skip_1d else []
             }
             
         #self.xrf_batch_thread = Loadh5AndFit(h5Param)
