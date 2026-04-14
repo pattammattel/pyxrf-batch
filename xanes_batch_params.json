@@ -1,0 +1,36 @@
+{
+      "job_1": {
+            "cwd": "/data/users/2023Q1/Huang_2023Q1/XANES_ptycho/New Folder",
+            "param": "/nsls2/data2/hxn/legacy/users/2024Q2/Michelson_2024Q2/pyxrf_model_parameters_284440.json",
+            "last_sid": 69205,
+            "first_sid": 69120,
+            "ref": "",
+            "fit_method": "nnls",
+            "elem": "Fe_K",
+            "align_elem": "Fe_K",
+            "e_shift": 0.0,
+            "admm_lambda": 5,
+            "work_flow": "build_xanes_map",
+            "norm": "sclr1_ch4",
+            "save_all": true,
+            "pre_edge": false,
+            "align": true
+      },
+      "job_2": {
+            "cwd": "/data/users/2023Q1/Huang_2023Q1/XANES_ptycho/New Folder",
+            "param": "/data/users/2023Q1/Huang_2023Q1/XANES_ptycho/pyxrf_model_parameters_69190.json",
+            "last_sid": 69205,
+            "first_sid": 69120,
+            "ref": "",
+            "fit_method": "nnls",
+            "elem": "Fe_K",
+            "align_elem": "Fe_K",
+            "e_shift": 0.0,
+            "admm_lambda": 5,
+            "work_flow": "build_xanes_map",
+            "norm": "sclr1_ch4",
+            "save_all": true,
+            "pre_edge": false,
+            "align": true
+      }
+}

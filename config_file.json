@@ -1,0 +1,9 @@
+{
+    "xrf_scan_range": "346726-346736",
+    "wd": "/data/users/2025Q2/Marschilok_2025Q2/xrf",
+    "param_file": "/data/users/2025Q2/Marschilok_2025Q2/xrf/pyxrf_model_parameters_346472.json",
+    "xanes_start_id": "128904",
+    "xanes_end_id": "128962",
+    "xanes_elem": "Zn_K",
+    "alignment_elem": "Fe_K"
+}
