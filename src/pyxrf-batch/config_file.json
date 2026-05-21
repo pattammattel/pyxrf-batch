@@ -1,7 +1,7 @@
 {
-    "xrf_scan_range": "346726-346736",
-    "wd": "/data/users/2025Q2/Marschilok_2025Q2/xrf",
-    "param_file": "/data/users/2025Q2/Marschilok_2025Q2/xrf/pyxrf_model_parameters_346472.json",
+    "xrf_scan_range": "405700-405710",
+    "wd": "/nsls2/data2/hxn/legacy/users/2026Q1/ZP_Comm_2026Q1",
+    "param_file": "/nsls2/data2/hxn/legacy/users/2026Q2/ZP_Commissioning_2026Q2/xrf/pyxrf_model_parameters_405571.json",
     "xanes_start_id": "128904",
     "xanes_end_id": "128962",
     "xanes_elem": "Zn_K",

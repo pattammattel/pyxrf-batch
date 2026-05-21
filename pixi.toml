@@ -1,0 +1,26 @@
+[workspace]
+authors = ["HXN Operator <xf03id@xf03idc-ws8.nsls2.bnl.local>"]
+channels = ["conda-forge"]
+name = "pyxrf"
+platforms = ["linux-64"]
+version = "0.1.0"
+preview = ["pixi-build"]
+
+
+[tasks]
+
+[dependencies]
+python = ">=3.10"
+pims = ">=0.7,<0.8"
+doct = ">=1.1.0,<2"
+pytz = ">=2025.2,<2026"
+xarray = ">=2026.2.0,<2027"
+pyqt = ">=5.15.11,<6"
+scikit-beam = ">=0.0.27,<0.0.28"
+pyqtgraph = ">=0.14.0,<0.15"
+
+
+[pypi-dependencies]
+hxntools = ">=0.6.5, <0.7"
+bluesky-tiled-plugins = ">=2.0.2, <3"
+pyxrf = { git = "https://github.com/pattammattel/PyXRF.git", branch = "master" }
