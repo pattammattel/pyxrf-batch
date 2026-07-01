@@ -1368,7 +1368,7 @@ def xrf_load_and_fit_from_list(sid_list, param_dict):
                             ignore_datafile_metadata = True,
                             fln_quant_calib_data = param_dict.get("quant_calib_file",''),
                             quant_ref_eline = param_dict.get("quant_calib_elem",'',),
-                            interpolate_to_uniform_grid = paramDict.get("interpolate_to_uniform_grid",True)
+                            interpolate_to_uniform_grid = param_dict.get("interpolate_to_uniform_grid",True)
                             )
         except:
                 missed_scans = missed_scans.append(sid)
