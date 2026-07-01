@@ -16,6 +16,8 @@ from pyxrf.api import *
 from epics import caget
 from calcs import *
 from pyxrf_tiffs_to_images import *
+import dask
+import dask.config
 
 logger = logging.getLogger()
 ui_path = os.path.dirname(os.path.abspath(__file__))
@@ -1119,6 +1121,8 @@ class Loadh5AndFitFromList(QThread):
 
 
     def run(self):
+        # Configure dask to use threaded scheduler to avoid multiprocessing issues in QThread
+        dask.config.set(scheduler='threads')
 
         for sid in self.scan_list_requested:
             fname = os.path.join(self.paramDict["wd"],f"scan2D_{int(sid)}.h5")
@@ -1183,6 +1187,9 @@ class Loadh5AndFitFromList(QThread):
             QtTest.QTest.qWait(5000)
     
         except : pass
+        finally:
+            # Reset dask config and cleanup
+            dask.config.set(scheduler='threads')
 
 
         print(f"failed to process {self.failed_scans}")
@@ -1223,6 +1230,8 @@ class Loadh5AndFitFromListLive(QThread):
         self.failed_scans = []
 
     def run(self):
+        # Configure dask to use threaded scheduler to avoid multiprocessing issues in QThread
+        dask.config.set(scheduler='threads')
 
         for sid in self.scan_list_requested:
             if not os.path.exists(os.path.join(self.paramDict["wd"],f"scan2D_{sid}.h5")):
@@ -1316,6 +1325,8 @@ class Loadh5AndFitForLive(QThread):
         self.scan_list_requested = self.paramDict["sidList"]
 
     def run(self):
+        # Configure dask to use threaded scheduler to avoid multiprocessing issues in QThread
+        dask.config.set(scheduler='threads')
 
         self.missed_scans = xrf_load_and_fit_from_list(self.scan_list_requested, 
                                                        self.paramDict)
@@ -1328,6 +1339,8 @@ class Loadh5AndFitForLive(QThread):
 
 
 def xrf_load_and_fit_from_list(sid_list, param_dict):
+    # Configure dask to use threaded scheduler (called from within QThread)
+    dask.config.set(scheduler='threads')
     
     missed_scans = []
 
@@ -1355,7 +1368,7 @@ def xrf_load_and_fit_from_list(sid_list, param_dict):
                             ignore_datafile_metadata = True,
                             fln_quant_calib_data = param_dict.get("quant_calib_file",''),
                             quant_ref_eline = param_dict.get("quant_calib_elem",'',),
-                            interpolate_to_uniform_grid = paramDict.get("interpolate_to_uniform_grid",True)
+                            interpolate_to_uniform_grid = param_dict.get("interpolate_to_uniform_grid",True)
                             )
         except:
                 missed_scans = missed_scans.append(sid)
@@ -1376,6 +1389,9 @@ class Loadh5AndFit(QThread):
 
 
     def run(self):
+        # Configure dask to use threaded scheduler to avoid multiprocessing issues in QThread
+        dask.config.set(scheduler='threads')
+        
         logger.info("h5 thread started")
         QtTest.QTest.qWait(500)
 
