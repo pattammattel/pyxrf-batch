@@ -1,9 +1,9 @@
 {
-    "xrf_scan_range": "405700-405710",
-    "wd": "/nsls2/data2/hxn/legacy/users/2026Q1/ZP_Comm_2026Q1",
-    "param_file": "/nsls2/data2/hxn/legacy/users/2026Q2/ZP_Commissioning_2026Q2/xrf/pyxrf_model_parameters_405571.json",
-    "xanes_start_id": "128904",
-    "xanes_end_id": "128962",
-    "xanes_elem": "Zn_K",
-    "alignment_elem": "Fe_K"
+    "xrf_scan_range": "417695",
+    "wd": "/data/users/current_user/xrf/Mn3O4_tested_1_ROI1",
+    "param_file": "/data/users/current_user/xrf/pyxrf_model_parameters_416927.json",
+    "xanes_start_id": "411522",
+    "xanes_end_id": "411672",
+    "xanes_elem": "Cu_K",
+    "alignment_elem": "Cu_K"
 }

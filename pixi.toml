@@ -1,11 +1,9 @@
 [workspace]
+name = "pyxrf-env"   # 💡 Changed to avoid collision with the 'pyxrf' package
+version = "0.1.0"
 authors = ["HXN Operator <xf03id@xf03idc-ws8.nsls2.bnl.local>"]
 channels = ["conda-forge"]
-name = "pyxrf"
 platforms = ["linux-64"]
-version = "0.1.0"
-preview = ["pixi-build"]
-
 
 [tasks]
 
@@ -17,8 +15,8 @@ pytz = ">=2025.2,<2026"
 xarray = ">=2026.2.0,<2027"
 pyqt = ">=5.15.11,<6"
 scikit-beam = ">=0.0.27,<0.0.28"
+numpy = ">=1.24,<2.5"
 pyqtgraph = ">=0.14.0,<0.15"
-
 
 [pypi-dependencies]
 hxntools = ">=0.6.5, <0.7"
