@@ -825,7 +825,7 @@ class xrf_3ID(QtWidgets.QMainWindow):
 
             elif tracking_file.endswith(".txt"):
                 log = np.loadtxt(tracking_file, dtype = int)
-                self.scan_list = list(log[:,0])
+                self.scan_list = list(log[:,1])
 
             self.pte_status.append(f"scans to process {self.scan_list}")
 
@@ -1522,7 +1522,7 @@ class TrackingFileToScanNumerThreadLive(QThread):
             else:
                 self.tracking_file_name.endswith(".txt")
                 log = np.loadtxt(self.tracking_file_name, dtype = int)
-                self.scan_list = list(log[:,0])
+                self.scan_list = list(log[:,1])
 
 
 
