@@ -150,7 +150,7 @@ class xrf_3ID(QtWidgets.QMainWindow):
             )
         self.pb_showBatch.clicked.connect(lambda: self.pte_status.append(str(self.batchJob)))
         self.pb_clear_batch.clicked.connect(lambda: self.batchJob.clear())
-        self.pb_stop_xanes_batch.clicked.connect(lambda:self.batch_xanes_thread.terminate())
+        self.pb_stop_xanes_batch.clicked.connect(self.stopXANESBatch)
 
         self.pb_open_pyxrf.clicked.connect(self.open_pyxrf)
         self.pb_close_plots.clicked.connect(self.close_all_plots)
@@ -347,19 +347,37 @@ class xrf_3ID(QtWidgets.QMainWindow):
             pass
 
     def stopXRFBatch(self):
-        try:
-            print("Trying to kill the process")
+        print("Stopping batch process...")
+        
+        # Stop h5thread
+        if hasattr(self, 'h5thread') and self.h5thread is not None and self.h5thread.isRunning():
             self.h5thread.requestInterruption()
-            self.h5thread.terminate()
+            if not self.h5thread.wait(3000):  # Wait 3 seconds
+                print("h5thread did not stop gracefully, terminating...")
+                self.h5thread.terminate()
+                self.h5thread.wait()  # Wait for termination to complete
 
-            if self.pyxrfBatchThread:
-
-                self.pyxrfBatchThread.requestInterruption()
+        # Stop pyxrfBatchThread
+        if hasattr(self, 'pyxrfBatchThread') and self.pyxrfBatchThread is not None and self.pyxrfBatchThread.isRunning():
+            self.pyxrfBatchThread.requestInterruption()
+            if not self.pyxrfBatchThread.wait(3000):  # Wait 3 seconds
+                print("pyxrfBatchThread did not stop gracefully, terminating...")
                 self.pyxrfBatchThread.terminate()
-            #print("Batch Process Killed")
-            
-        except: pass
-        print("Batch Process Killed")
+                self.pyxrfBatchThread.wait()  # Wait for termination to complete
+                
+        print("Batch Process Stopped")
+
+    def stopXANESBatch(self):
+        if hasattr(self, 'batch_xanes_thread') and self.batch_xanes_thread is not None and self.batch_xanes_thread.isRunning():
+            print("Stopping XANES batch process...")
+            self.batch_xanes_thread.requestInterruption()
+            if not self.batch_xanes_thread.wait(3000):  # Wait 3 seconds
+                print("XANES batch thread did not stop gracefully, terminating...")
+                self.batch_xanes_thread.terminate()
+                self.batch_xanes_thread.wait()
+            print("XANES Batch Process Stopped")
+            self.xanes_batch_progress.setRange(0, 100)
+            self.xanes_batch_progress.setValue(0)
 
         
     @show_error_message_box
@@ -615,15 +633,26 @@ class xrf_3ID(QtWidgets.QMainWindow):
             pass
 
     def stopAuto(self):
-        self.scan_thread.requestInterruption()
-        #self.scan_thread.wait()
-        QtTest.QTest.qWait(int(1000))
-        self.scan_thread.terminate()
+        if hasattr(self, 'scan_thread') and self.scan_thread is not None and self.scan_thread.isRunning():
+            print("Stopping live processing...")
+            self.scan_thread.requestInterruption()
+            if not self.scan_thread.wait(3000):  # Wait 3 seconds for graceful shutdown
+                print("scan_thread did not stop gracefully, terminating...")
+                self.scan_thread.terminate()
+                self.scan_thread.wait()  # Wait for termination to complete
+        
+        # Stop the worker thread if it exists
+        if hasattr(self, 'xrf_first_last_thread') and isinstance(self.xrf_first_last_thread, QThread) and self.xrf_first_last_thread.isRunning():
+            self.xrf_first_last_thread.requestInterruption()
+            if not self.xrf_first_last_thread.wait(3000):
+                self.xrf_first_last_thread.terminate()
+                self.xrf_first_last_thread.wait()
+                
         self.pte_status.clear()
         self.lbl_live_sts_msg.setText("  Live processing is OFF  ")
         self.lbl_live_sts_msg.setStyleSheet("background-color: yellow")
         self.pb_live.setEnabled(True)
-        print(f"Thread Running: {self.scan_thread.isRunning()}")
+        print("Live processing stopped")
 
     def liveButtonSts(self, sts):
         self.pb_live.setEnabled(sts)
@@ -766,10 +795,23 @@ class xrf_3ID(QtWidgets.QMainWindow):
         print(f"Auto XRF Trackfile Running: {self.trackfile_thread.isRunning()}")
 
     def stop_file_tracking(self):
-        self.trackfile_thread.requestInterruption()
-        self.trackfile_thread.terminate()
-        self.xrf_batch_tracking_thread.requestInterruption()
-        self.xrf_batch_tracking_thread.terminate()
+        print("Stopping file tracking...")
+        
+        if hasattr(self, 'trackfile_thread') and self.trackfile_thread is not None and self.trackfile_thread.isRunning():
+            self.trackfile_thread.requestInterruption()
+            if not self.trackfile_thread.wait(3000):
+                print("trackfile_thread did not stop gracefully, terminating...")
+                self.trackfile_thread.terminate()
+                self.trackfile_thread.wait()
+                
+        if hasattr(self, 'xrf_batch_tracking_thread') and self.xrf_batch_tracking_thread is not None and self.xrf_batch_tracking_thread.isRunning():
+            self.xrf_batch_tracking_thread.requestInterruption()
+            if not self.xrf_batch_tracking_thread.wait(3000):
+                print("xrf_batch_tracking_thread did not stop gracefully, terminating...")
+                self.xrf_batch_tracking_thread.terminate()
+                self.xrf_batch_tracking_thread.wait()
+                
+        print("File tracking stopped")
 
     def pyxrf_track_file_mode(self, sid_list):
         print(f"live process started : {sid_list}")
@@ -835,10 +877,14 @@ class xrf_3ID(QtWidgets.QMainWindow):
             
 
     def stop_multipling_tracking(self):
-
-        if self.trackfile_thread.isRunning():
+        if hasattr(self, 'trackfile_thread') and self.trackfile_thread is not None and self.trackfile_thread.isRunning():
+            print("Stopping multiple file tracking...")
             self.trackfile_thread.requestInterruption()
-            self.trackfile_thread.terminate()
+            if not self.trackfile_thread.wait(3000):
+                print("trackfile_thread did not stop gracefully, terminating...")
+                self.trackfile_thread.terminate()
+                self.trackfile_thread.wait()
+            print("Multiple file tracking stopped")
 
     #not using
     def pyxrf_live_collector_mode(self, sid_list):
@@ -904,19 +950,32 @@ class xrf_3ID(QtWidgets.QMainWindow):
         self.threadpool.start(worker)
 
     def closeEvent(self,event):
-
-        for thrd in [self.scan_thread,self.scan_sts_thread,self.xanes_thread,self.h5thread]:
-            if not thrd == None:
-                if thrd.isRunning():
+        print("Closing application, stopping all threads...")
+        
+        # List of all possible thread attributes
+        thread_attrs = ['scan_thread', 'scan_sts_thread', 'xanes_thread', 'h5thread', 
+                       'xrf_first_last_thread', 'xrf_batch_thread', 'trackfile_thread',
+                       'xrf_batch_tracking_thread', 'batch_xanes_thread', 'pyxrfBatchThread']
+        
+        for attr_name in thread_attrs:
+            if hasattr(self, attr_name):
+                thrd = getattr(self, attr_name)
+                if thrd is not None and isinstance(thrd, QThread) and thrd.isRunning():
+                    print(f"Stopping {attr_name}...")
                     thrd.requestInterruption()
-                    #thrd.wait()
-                    thrd.terminate()
-                    QtTest.QTest.qWait(100)
-                    #thrd.wait()
-        if not self.pyxrf_subprocess == None:
+                    if not thrd.wait(2000):  # Wait 2 seconds
+                        print(f"{attr_name} did not stop gracefully, terminating...")
+                        thrd.terminate()
+                        thrd.wait()
+        
+        # Kill pyxrf subprocess if running
+        if hasattr(self, 'pyxrf_subprocess') and self.pyxrf_subprocess is not None:
             if self.pyxrf_subprocess.poll() is None:
+                print("Killing pyxrf subprocess...")
                 self.pyxrf_subprocess.kill()
         
+        print("All threads stopped, exiting...")
+        event.accept()
         sys.exit()
 
 
@@ -975,8 +1034,12 @@ class ScanListStream(QThread):
         timeout = time.time() + 60*60   # 60 minute intervals
         timeout_for_live = time.time() + 60*60*24*5 # max 5 days active loop 
         previous_list = [100,200]
-        while True:
+        while not self.isInterruptionRequested():
             QtTest.QTest.qWait(300)
+            
+            if self.isInterruptionRequested():
+                break
+                
             sid = int(caget('XF:03IDC-ES{Status}ScanID-I'))
 
             if caget('XF:03IDC-ES{Status}ScanRunning-I') == 0 and not sid in self.scans_to_process and sid not in previous_list:
@@ -992,6 +1055,8 @@ class ScanListStream(QThread):
 
             if time.time() > timeout_for_live:
                 break
+        
+        print("ScanListStream thread stopped")
 
 
 class ScanListStream2(QThread):
@@ -1009,8 +1074,12 @@ class ScanListStream2(QThread):
         timeout_for_live = time.time() + 60*60*24*5 # max 5 days active loop 
         previous_list = [100,200]
 
-        while True:
+        while not self.isInterruptionRequested():
             QtTest.QTest.qWait(1000*60)
+            
+            if self.isInterruptionRequested():
+                break
+                
             sid = int(caget('XF:03IDC-ES{Status}ScanID-I'))
             
             if sid-first_sid > 30:
@@ -1026,6 +1095,8 @@ class ScanListStream2(QThread):
                     
             elif time.time() > timeout_for_live:
                 break
+        
+        print("ScanListStream2 thread stopped")
                 
 
 
@@ -1039,8 +1110,12 @@ class ScanNumberStream(QThread):
     def run(self):
         self.enableLiveButton.emit(False)
         sid_sent = 100
-        while True:
+        while not self.isInterruptionRequested():
             QtTest.QTest.qWait(1000)
+            
+            if self.isInterruptionRequested():
+                break
+                
             sid = int(caget('XF:03IDC-ES{Status}ScanID-I'))
             hdr = db[int(sid)]
             start_doc = hdr["start"]
@@ -1053,17 +1128,24 @@ class ScanNumberStream(QThread):
                     print(f"new scan signal sent: {sid}")
                     self.sleep(self.buffertime)
                     #QtTest.QTest.qWait(5000)
+        
+        print("ScanNumberStream thread stopped")
                 
 class scanStatus(QThread):
     scan_sts = pyqtSignal(int)
     scan_num = pyqtSignal(int)
 
     def run(self):
-        while True:
+        while not self.isInterruptionRequested():
             QtTest.QTest.qWait(2000)
+            
+            if self.isInterruptionRequested():
+                break
             
             self.scan_num.emit(int(caget('XF:03IDC-ES{Status}ScanID-I')))
             self.scan_sts.emit(caget('XF:03IDC-ES{Status}ScanRunning-I'))
+        
+        print("scanStatus thread stopped")
 
 class XANESProcessing(QThread):
     def __init__(self, paramDict):
@@ -1086,6 +1168,10 @@ class XANESBatchProcessing(QThread):
     def run(self):
         n = 0 
         for key, value in self.batch_job_dict.items():
+            
+            if self.isInterruptionRequested():
+                print("XANES batch processing interrupted by user")
+                break
 
             save_dict = self.paramDict
             self.paramDict = value
@@ -1108,6 +1194,8 @@ class XANESBatchProcessing(QThread):
                     json.dump(save_dict,fp, indent=6)
             except:
                 pass
+        
+        print("XANES batch processing completed or stopped")
 
 #using for track file mode
 class Loadh5AndFitFromList(QThread):
@@ -1125,6 +1213,11 @@ class Loadh5AndFitFromList(QThread):
         dask.config.set(scheduler='threads')
 
         for sid in self.scan_list_requested:
+            
+            if self.isInterruptionRequested():
+                print("Loadh5AndFitFromList interrupted by user")
+                break
+                
             fname = os.path.join(self.paramDict["wd"],f"scan2D_{int(sid)}.h5")
             print(f"{fname} exists")
 
@@ -1170,6 +1263,10 @@ class Loadh5AndFitFromList(QThread):
     
                 except : pass
         '''
+
+        if self.isInterruptionRequested():
+            print("Loadh5AndFitFromList interrupted before batch fitting")
+            return
 
         try:
             pyxrf_batch(int(self.scan_list_requested[0]), 
@@ -1234,6 +1331,11 @@ class Loadh5AndFitFromListLive(QThread):
         dask.config.set(scheduler='threads')
 
         for sid in self.scan_list_requested:
+            
+            if self.isInterruptionRequested():
+                print("Loadh5AndFitFromListLive interrupted by user")
+                break
+                
             if not os.path.exists(os.path.join(self.paramDict["wd"],f"scan2D_{sid}.h5")):
                 h = db[int(sid)]
                 if bool(h.stop):
@@ -1261,6 +1363,11 @@ class Loadh5AndFitFromListLive(QThread):
 
         
         for sid in self.scan_list_requested:
+            
+            if self.isInterruptionRequested():
+                print("Loadh5AndFitFromListLive interrupted during fitting")
+                break
+                
             fitted_file_present = os.path.exists(os.path.join(self.paramDict["wd"],f"output_tiff_scan2D_{sid}"))
             h5_present = os.path.exists(os.path.join(self.paramDict["wd"],f"scan2D_{sid}.h5"))
             
@@ -1371,9 +1478,10 @@ def xrf_load_and_fit_from_list(sid_list, param_dict):
                             interpolate_to_uniform_grid = param_dict.get("interpolate_to_uniform_grid",True)
                             )
         except:
-                missed_scans = missed_scans.append(sid)
+            if missed_scans is not None:
+                missed_scans.append(sid)
                 
-        return missed_scans
+    return missed_scans
 
 #using for batch fitting
 class Loadh5AndFit(QThread):
@@ -1398,6 +1506,10 @@ class Loadh5AndFit(QThread):
         #print(f"{self.paramDict['file_overwrite_existing'] = }")
         print(f"\n Process: make hdf in batch-->xrf fitting in batch" )
         for sid in self.paramDict["sidList"]: #filter for 1d
+            
+            if self.isInterruptionRequested():
+                print("Loadh5AndFit interrupted by user during h5 creation")
+                break
 
             try:
                 hdr = db[int(sid)]
@@ -1421,6 +1533,9 @@ class Loadh5AndFit(QThread):
                 pass
             QtTest.QTest.qWait(1000)
 
+        if self.isInterruptionRequested():
+            print("Loadh5AndFit interrupted before batch fitting")
+            return
 
         try:
             print(f"interpolation marker: {self.paramDict.get('interpolate_to_uniform_grid',True)}")
@@ -1505,7 +1620,10 @@ class TrackingFileToScanNumerThreadLive(QThread):
 
     def run(self):
 
-        while True:
+        while not self.isInterruptionRequested():
+            
+            if self.isInterruptionRequested():
+                break
 
             if self.tracking_file_name.endswith(".csv"):
                 log = pd.read_csv(self.tracking_file_name).dropna()
@@ -1539,6 +1657,8 @@ class TrackingFileToScanNumerThreadLive(QThread):
 
             if self.repeated_attempt >3600:
                 break
+        
+        print("TrackingFileToScanNumerThreadLive thread stopped")
 
 
 
