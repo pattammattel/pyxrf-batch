@@ -1,6 +1,7 @@
-[workspace]
-name = "pyxrf-env-batch"  
+[project]
+name = "pyxrf-batch"
 version = "0.1.0"
+description = "PyXRF batch processing with exact pinned versions"
 authors = ["HXN Operator <xf03id@xf03idc-ws8.nsls2.bnl.local>"]
 channels = ["conda-forge"]
 platforms = ["linux-64"]
@@ -8,18 +9,178 @@ platforms = ["linux-64"]
 [tasks]
 
 [dependencies]
-python = ">=3.10"
-pims = ">=0.7,<0.8"
-doct = ">=1.1.0,<2"
-pytz = ">=2025.2,<2026"
-xarray = ">=2026.2.0,<2027"
-pyqt = ">=5.15.11,<6"
-scikit-beam = ">=0.0.27,<0.0.28"
-numpy = ">=1.24,<2.5"
-pyqtgraph = ">=0.14.0,<0.15"
+# Core Python and package management
+python = "3.14.5"
+pip = "26.1.1"
+setuptools = "82.0.1"
 
+# Scientific computing core
+numpy = "2.4.6"
+scipy = "1.17.1"
+pandas = "3.0.3"
+h5py = "3.16.0"
+dask = "2026.3.0"
+distributed = "2026.3.0"
+xarray = "2026.4.0"
+
+# Data visualization (pyqtgraph excluded due to packaging issues)
+matplotlib = "3.10.9"
+
+# Image processing
+pillow = "12.2.0"
+imagecodecs = "2026.5.10"
+imageio = "2.37.0"
+scikit-image = "0.26.0"
+tifffile = "2026.5.15"
+
+# PyXRF ecosystem
+scikit-beam = "0.0.27"
+lmfit = "1.3.4"
+xraylib = "4.2.1"
+asteval = "1.0.8"
+uncertainties = "3.2.3"
+
+# Qt/GUI framework
+pyqt = "5.15.11"
+pyqt5-sip = "12.17.0"
+qt-main = "5.15.15"
+qtpy = "2.4.3"
+
+# IPython and widgets
+ipywidgets = "8.1.8"
+jupyterlab_widgets = "3.0.16"
+widgetsnbextension = "4.0.15"
+
+# Data handling utilities
+pims = "0.7"
+doct = "1.1.0"
+sliceator = "1.1.0"
+networkx = "3.6.1"
+
+# Time handling
+pytz = "2025.2"
+python-dateutil = "2.9.0.post0"
+tzdata = "2025c"
+
+# Build and utility tools
+jinja2 = "3.1.6"
+markupsafe = "3.0.3"
+packaging = "26.2"
+humanize = "4.15.0"
+prettytable = "3.17.0"
+typing_extensions = "4.15.0"
+future = "1.0.0"
+six = "1.17.0"
+
+# Math libraries (OpenBLAS)
+libblas = "3.11.0"
+libcblas = "3.11.0"
+liblapack = "3.11.0"
+libopenblas = "0.3.33"
+
+# Compression libraries
+blosc = "1.21.6"
+c-blosc2 = "3.0.3"
+bzip2 = "1.0.8"
+lz4-c = "1.10.0"
+snappy = "1.2.2"
+zstd = "1.5.7"
+
+# Image format libraries
+libjpeg-turbo = "3.1.4.1"
+libpng = "1.6.58"
+libtiff = "4.7.1"
+libwebp-base = "1.6.0"
+openjpeg = "2.5.4"
+
+# SSL and security
+openssl = "3.6.2"
+ca-certificates = "2026.5.20"
+
+# System libraries
+libsqlite = "3.53.1"
+libxml2 = "2.15.3"
+libffi = "3.5.2"
+readline = "8.3"
+ncurses = "6.6"
+libzlib = "1.3.2"
 
 [pypi-dependencies]
-hxntools = ">=0.6.5, <0.7"
-bluesky-tiled-plugins = "==2.0.8"
-pyxrf = { git = "https://github.com/pattammattel/PyXRF.git", branch = "master" }
+# Bluesky ecosystem
+bluesky = "==1.15.1"
+ophyd = "==1.11.1"
+ophyd_async = "==0.16"
+databroker = "==2.0.0"
+event_model = "==1.23.1"
+tiled = "==0.2.10"
+bluesky_kafka = "==0.10.0"
+bluesky_tiled_plugins = "==2.0.3"
+suitcase_mongo = "==0.7.0"
+nslsii = "==0.11.9"
+hxntools = "==0.6.5"
+
+# EPICS control
+pyepics = "==3.5.10"
+caproto = "==1.3.0"
+
+# Image processing (PyPI)
+opencv_python = "==4.13.0.92"
+pystackreg = "==0.2.8"
+
+# Data handling
+compress_pickle = "==2.1.0"
+historydict = "==1.2.6"
+pydantic = "==2.13.4"
+pydantic_core = "==2.46.4"
+pydantic_numpy = "==8.0.1"
+
+# Database
+pymongo = "==4.17.0"
+redis = "==7.4.0"
+redis_json_dict = "==0.2.2"
+ldap3 = "==2.9.1"
+
+# Kafka
+confluent_kafka = "==2.14.0"
+
+# Utilities
+click = "==8.4.1"
+rich = "==15.0.0"
+typer = "==0.26.1"
+pyyaml = "==6.0.3"
+ruamel_yaml = "==0.18.17"
+toml = "==0.10.2"
+requests = "==2.34.2"
+httpx = "==0.28.1"
+certifi = "==2026.5.20"
+
+# IPython and widgets
+ipython = "==9.13.0"
+jedi = "==0.20.0"
+prompt_toolkit = "==3.0.52"
+pygments = "==2.20.0"
+
+# Numerical computing
+numba = "==0.65.1"
+llvmlite = "==0.47.0"
+numexpr = "==2.14.1"
+awkward = "==2.9.0"
+awkward_cpp = "==52"
+sparse = "==0.18.0"
+
+# Misc utilities
+tqdm = "==4.67.3"
+fsspec = "==2026.4.0"
+cloudpickle = "==3.1.2"
+dill = "==0.4.1"
+toolz = "==1.1.0"
+partd = "==1.4.2"
+locket = "==1.0.0"
+sortedcontainers = "==2.4.0"
+tblib = "==3.2.2"
+zict = "==3.0.0"
+psutil = "==7.2.2"
+pint = "==0.25.3"
+
+# PyXRF (using custom version from list)
+pyxrf = "==0+untagged.2345.g1488aab"
