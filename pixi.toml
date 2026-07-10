@@ -1,3 +1,14 @@
+# PyXRF Batch Processing Environment
+# 
+# Setup Instructions:
+# 1. Install dependencies: pixi install
+# 2. Install PyXRF from git: pixi run install-pyxrf
+# 3. Activate environment: pixi shell
+#
+# Note: PyXRF is installed separately with --no-deps to prevent
+# its requirements.txt from overriding the exact versions pinned here.
+# All PyXRF dependencies (atom, dask, h5py, etc.) are already managed below.
+
 [project]
 name = "pyxrf-batch"
 version = "0.1.0"
@@ -7,6 +18,11 @@ channels = ["conda-forge"]
 platforms = ["linux-64"]
 
 [tasks]
+# Install PyXRF from git without dependencies (dependencies managed by pixi)
+install-pyxrf = "pip install --no-deps git+https://github.com/pattammattel/PyXRF.git@master"
+
+# Reinstall PyXRF (useful during development)
+reinstall-pyxrf = "pip uninstall -y pyxrf && pip install --no-deps git+https://github.com/pattammattel/PyXRF.git@master"
 
 [dependencies]
 # Core Python and package management
@@ -153,6 +169,9 @@ toml = "==0.10.2"
 requests = "==2.34.2"
 httpx = "==0.28.1"
 certifi = "==2026.5.20"
+progress = "==1.6.1"
+atom = "==0.12.1"
+jsonschema = "==4.26.0"
 
 # IPython and widgets
 ipython = "==9.13.0"
@@ -182,5 +201,8 @@ zict = "==3.0.0"
 psutil = "==7.2.2"
 pint = "==0.25.3"
 
-# PyXRF (using custom version from list)
-pyxrf = "==0+untagged.2345.g1488aab"
+# PyXRF installation:
+# PyXRF is NOT listed here to avoid dependency conflicts
+# Instead, install it using: pixi run install-pyxrf
+# This installs PyXRF from git WITHOUT its dependencies (--no-deps)
+# All required dependencies are already pinned above
