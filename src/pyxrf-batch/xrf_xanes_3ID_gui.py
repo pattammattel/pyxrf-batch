@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import time
-import pyqtgraph as pg
+# import pyqtgraph as pg  # Commented out due to pixi packaging issues
 import glob
 from functools import wraps
 from collections import deque
@@ -616,14 +616,16 @@ class xrf_3ID(QtWidgets.QMainWindow):
         self.plotCalibration()
 
     def plotCalibration(self):
-        if self.rb_calib_derivative.isChecked():
-            pg.plot(self.calib_spec[:, 0], np.gradient(self.calib_spec[:, 1]),
-                    pen = pg.mkPen(pg.mkColor(0,0,255,255), width=3),
-                    symbol='o',symbolSize = 6,symbolBrush = 'r', title = "Calibration Spectrum")
-        else:
-            pg.plot(self.calib_spec[:, 0], self.calib_spec[:, 1],
-                    pen = pg.mkPen(pg.mkColor(0,0,255,255), width=3),
-                    symbol='o',symbolSize = 6,symbolBrush = 'r', title = "Calibration Spectrum")
+        # Pyqtgraph plotting disabled due to pixi packaging issues
+        print("Calibration plotting is currently disabled (pyqtgraph unavailable)")
+        # if self.rb_calib_derivative.isChecked():
+        #     pg.plot(self.calib_spec[:, 0], np.gradient(self.calib_spec[:, 1]),
+        #             pen = pg.mkPen(pg.mkColor(0,0,255,255), width=3),
+        #             symbol='o',symbolSize = 6,symbolBrush = 'r', title = "Calibration Spectrum")
+        # else:
+        #     pg.plot(self.calib_spec[:, 0], self.calib_spec[:, 1],
+        #             pen = pg.mkPen(pg.mkColor(0,0,255,255), width=3),
+        #             symbol='o',symbolSize = 6,symbolBrush = 'r', title = "Calibration Spectrum")
 
     def saveCalibration(self):
         file_name = QFileDialog().getSaveFileName(self, "Save Calibration", '', 'txt file (*.txt)')
