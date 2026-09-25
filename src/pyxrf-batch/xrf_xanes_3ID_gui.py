@@ -738,9 +738,18 @@ class xrf_3ID(QtWidgets.QMainWindow):
 
         #print(f"{self.skipped_1d = }")
 
-        self.xrf_first_last_thread = Loadh5AndFitFromListLive(h5Param,self.skipped_1d)
-        self.xrf_first_last_thread.start()
+        # pyxrf/HDF5 are not thread-safe, and overwriting the reference to a
+        # still-running QThread destroys it mid-run -> core dump. Skip this
+        # cycle if the previous batch is still going; the poller re-emits next round.
+        if isinstance(self.xrf_first_last_thread, Loadh5AndFitFromListLive) \
+                and self.xrf_first_last_thread.isRunning():
+            print("Live: previous batch still processing; skipping this cycle")
+            return
+
+        self.xrf_first_last_thread = Loadh5AndFitFromListLive(h5Param, self.skipped_1d)
+        # connect before start() so the end-of-run signal is never missed
         self.xrf_first_last_thread.skipped_1d_scans_sig.connect(self.handle_returned_1d_list)
+        self.xrf_first_last_thread.start()
         #self.xrf_first_last_thread.last_processed.connect(self.sb_last_sid_processed.setValue)
 
 
@@ -839,6 +848,13 @@ class xrf_3ID(QtWidgets.QMainWindow):
             }
             
         #self.xrf_batch_thread = Loadh5AndFit(h5Param)
+        # Same guard as live mode: never run two fitting threads at once
+        # (concurrent HDF5/pyxrf access and QThread-destroyed-while-running crash).
+        if hasattr(self, 'xrf_batch_tracking_thread') \
+                and self.xrf_batch_tracking_thread.isRunning():
+            print("Track file: previous batch still processing; skipping this cycle")
+            return
+
         self.xrf_batch_tracking_thread = Loadh5AndFitFromList(h5Param)
         self.xrf_batch_tracking_thread.start()
 
@@ -1580,7 +1596,8 @@ def xrf_load_and_fit_from_list(sid_list, param_dict):
 
         print(f"[LOAD OK] pyxrf h5 for {sid = } is created")
 
-        QtTest.QTest.qWait(1000)
+        # thread-safe sleep; QTest.qWait pumps the event loop from a worker thread
+        QThread.msleep(1000)
         if not param_dict["XRFfit"]:
             continue
 
