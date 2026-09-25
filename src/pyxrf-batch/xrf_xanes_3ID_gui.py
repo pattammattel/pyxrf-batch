@@ -329,7 +329,8 @@ class xrf_3ID(QtWidgets.QMainWindow):
 
         elif not self.rb_make_hdf.isChecked() and self.rb_xrf_fit.isChecked():
             
-            xrf_batch_param_dict = {"sid_i":all_sid[0],
+            xrf_batch_param_dict = {"sidList":all_sid,
+                                    "sid_i":all_sid[0],
                                     "sid_f":all_sid[-1],
                                     "wd":cwd,
                                     "xrfParam":self.le_param.text(),
@@ -1214,84 +1215,125 @@ class Loadh5AndFitFromList(QThread):
         # Configure dask to use threaded scheduler to avoid multiprocessing issues in QThread
         dask.config.set(scheduler='threads')
 
+        skip_scan_types = self.paramDict.get("skip_scan_types", [])
+        loaded_scans = []
+        skipped_scans = []
+        self.failed_scans = []
+
         for sid in self.scan_list_requested:
-            
+
             if self.isInterruptionRequested():
                 print("Loadh5AndFitFromList interrupted by user")
                 break
-                
-            fname = os.path.join(self.paramDict["wd"],f"scan2D_{int(sid)}.h5")
-            print(f"{fname} exists")
 
-            if not os.path.exists(fname):
-                h = db[int(sid)]
-                if bool(h.stop):
-                    if h.start['plan_type'] != 'FlyPlan1D' or '1D_FLY_PANDA':
-                        print(f"{sid = }, processing")
-                        try:
-                            make_hdf(int(sid),
-                                    wd = self.paramDict["wd"],
-                                    file_overwrite_existing = False,
-                                    create_each_det = True,
-                                    skip_scan_types = self.paramDict.get("skip_scan_types", [])
-                                    )
-                            
-                        except:
-                            if sid not in self.failed_scans: 
-                                self.failed_scans.append(sid)
-                                #self.le_failed_scans.setText(self.failed_scans)
-                            pass
+            sid = int(sid)
+            fname = os.path.join(self.paramDict["wd"], f"scan2D_{sid}.h5")
 
-                else:
-                    print(f"{fname} exists; skipped")
-        '''
-        for sid in self.scan_list_requested:
-            fitted_file_present = os.path.exists(os.path.join(self.paramDict["wd"],f"output_tiff_scan2D_{sid}"))
-            h5_present = os.path.exists(os.path.join(self.paramDict["wd"],f"scan2D_{sid}.h5"))
-            if not fitted_file_present and h5_present:
+            if os.path.exists(fname):
+                loaded_scans.append(sid)
+                print(f"[LOAD SKIPPED] {sid = }: h5 file already exists")
+                continue
 
-                try:
-                    pyxrf_batch(int(sid), 
-                                int(sid), 
-                                wd=self.paramDict["wd"], 
-                                param_file_name=self.paramDict["xrfParam"], 
-                                scaler_name=self.paramDict["norm"], 
-                                save_tiff=self.paramDict["saveXRFTiff"],
-                                save_txt = False,
-                                ignore_datafile_metadata = True,
-                                fln_quant_calib_data = self.paramDict.get("quant_calib_file",''),
-                                quant_ref_eline = self.paramDict.get("quant_calib_elem",'')
-                                )
-    
-                except : pass
-        '''
+            try:
+                h = db[sid]
+            except Exception as e:
+                self.failed_scans.append(sid)
+                print(f"[LOAD FAILED] {sid = }: could not retrieve scan from databroker ({e})")
+                continue
+
+            if not bool(h.stop):
+                skipped_scans.append(sid)
+                print(f"[LOAD SKIPPED] {sid = }: scan has no stop document (incomplete/aborted)")
+                continue
+
+            plan_type = h.start.get('plan_type', 'unknown')
+            if plan_type in skip_scan_types:
+                skipped_scans.append(sid)
+                print(f"[LOAD SKIPPED] {sid = }: plan_type '{plan_type}' is in skip list")
+                continue
+
+            print(f"{sid = }, processing")
+            try:
+                make_hdf(sid,
+                        wd = self.paramDict["wd"],
+                        file_overwrite_existing = False,
+                        create_each_det = True,
+                        skip_scan_types = skip_scan_types
+                        )
+            except Exception as e:
+                self.failed_scans.append(sid)
+                print(f"[LOAD FAILED] {sid = }: make_hdf raised an error ({e})")
+                continue
+
+            if os.path.exists(fname):
+                loaded_scans.append(sid)
+                print(f"[LOAD OK] pyxrf h5 for {sid = } is created")
+            else:
+                skipped_scans.append(sid)
+                print(f"[LOAD SKIPPED] {sid = }: no h5 file was produced (filtered scan type)")
+
+        print(
+            f"\nh5 load summary: {len(loaded_scans)} available, "
+            f"{len(skipped_scans)} skipped, {len(self.failed_scans)} failed"
+        )
+        if skipped_scans:
+            print(f"  skipped scans: {skipped_scans}")
+        if self.failed_scans:
+            print(f"  failed scans:  {self.failed_scans}")
 
         if self.isInterruptionRequested():
             print("Loadh5AndFitFromList interrupted before batch fitting")
             return
 
-        try:
-            pyxrf_batch(int(self.scan_list_requested[0]), 
-                        int(self.scan_list_requested[-1]), 
-                        wd=self.paramDict["wd"], 
-                        param_file_name=self.paramDict["xrfParam"], 
-                        scaler_name=self.paramDict["norm"], 
-                        save_tiff=self.paramDict["saveXRFTiff"],
-                        save_txt = False,
-                        ignore_datafile_metadata = True,
-                        fln_quant_calib_data = self.paramDict.get("quant_calib_file",''),
-                        quant_ref_eline = self.paramDict.get("quant_calib_elem",''),
-                        interpolate_to_uniform_grid = self.paramDict.get("interpolate_to_uniform_grid",True)
-                        )
-            QtTest.QTest.qWait(5000)
-    
-        except : pass
-        finally:
-            # Reset dask config and cleanup
-            dask.config.set(scheduler='threads')
+        if not loaded_scans:
+            print("No h5 files available to fit; nothing to do")
+            return
 
+        fitted_scans = []
+        self.fit_failed_scans = []
+        for sid in loaded_scans:
 
-        print(f"failed to process {self.failed_scans}")
+            if self.isInterruptionRequested():
+                print("Loadh5AndFitFromList interrupted during batch fitting")
+                break
+
+            out_dir = os.path.join(self.paramDict["wd"], f"output_tiff_scan2D_{sid}")
+            try:
+                pyxrf_batch(sid,
+                            sid,
+                            wd=self.paramDict["wd"],
+                            param_file_name=self.paramDict["xrfParam"],
+                            scaler_name=self.paramDict["norm"],
+                            save_tiff=self.paramDict["saveXRFTiff"],
+                            save_txt = False,
+                            ignore_datafile_metadata = True,
+                            fln_quant_calib_data = self.paramDict.get("quant_calib_file",''),
+                            quant_ref_eline = self.paramDict.get("quant_calib_elem",''),
+                            interpolate_to_uniform_grid = self.paramDict.get("interpolate_to_uniform_grid",True)
+                            )
+            except Exception as e:
+                self.fit_failed_scans.append(sid)
+                print(f"[FIT FAILED] {sid = }: pyxrf_batch raised an error ({e})")
+                continue
+
+            if os.path.exists(out_dir):
+                fitted_scans.append(sid)
+                print(f"[FIT OK] {sid = } fitted")
+            else:
+                self.fit_failed_scans.append(sid)
+                print(f"[FIT FAILED] {sid = }: no fit output was produced")
+
+        QtTest.QTest.qWait(5000)
+
+        # Reset dask config and cleanup
+        dask.config.set(scheduler='threads')
+
+        print(
+            f"\nfit summary: {len(fitted_scans)} fitted, "
+            f"{len(self.fit_failed_scans)} failed"
+        )
+        if self.fit_failed_scans:
+            print(f"  fit failed scans: {self.fit_failed_scans}")
                     
         # for sid in self.scan_list_requested:
         #     fit_fname = os.path.join(self.paramDict["wd"],f"output_tiff_scan2D_{sid}")
@@ -1332,95 +1374,127 @@ class Loadh5AndFitFromListLive(QThread):
         # Configure dask to use threaded scheduler to avoid multiprocessing issues in QThread
         dask.config.set(scheduler='threads')
 
+        skip_scan_types = self.paramDict.get("skip_scan_types", [])
+        loaded_scans = []
+        skipped_scans = []
+        self.failed_scans = []
+
         for sid in self.scan_list_requested:
-            
+
             if self.isInterruptionRequested():
                 print("Loadh5AndFitFromListLive interrupted by user")
                 break
-                
-            if not os.path.exists(os.path.join(self.paramDict["wd"],f"scan2D_{sid}.h5")):
-                h = db[int(sid)]
-                if bool(h.stop):
-                    if sid not in self.skipped_1d and h.start['plan_type'] != 'FlyPlan1D':
-                        print(f"{sid = }, processing")
-                        
-                        try:
-                            make_hdf(int(sid),
-                                    wd = self.paramDict["wd"],
-                                    file_overwrite_existing = True,
-                                    create_each_det = True,
-                                    skip_scan_types = self.paramDict.get("skip_scan_types", [])
-                                    )
-                            
-                        except: 
-                            if sid not in self.failed_scans: 
-                                self.failed_scans.append(sid)
-                                #self.le_failed_scans.setText(self.failed_scans)
-                            
-                            pass
 
-                    else:
-                       if sid not in self.skipped_1d:
-                           self.skipped_1d.append(int(sid))
+            sid = int(sid)
+            fname = os.path.join(self.paramDict["wd"], f"scan2D_{sid}.h5")
 
-        
+            if os.path.exists(fname):
+                loaded_scans.append(sid)
+                print(f"[LOAD SKIPPED] {sid = }: h5 file already exists")
+                continue
+
+            try:
+                h = db[sid]
+            except Exception as e:
+                self.failed_scans.append(sid)
+                print(f"[LOAD FAILED] {sid = }: could not retrieve scan from databroker ({e})")
+                continue
+
+            if not bool(h.stop):
+                skipped_scans.append(sid)
+                print(f"[LOAD SKIPPED] {sid = }: scan has no stop document (incomplete/aborted)")
+                continue
+
+            plan_type = h.start.get('plan_type', 'unknown')
+            if sid in self.skipped_1d or plan_type == 'FlyPlan1D' or plan_type in skip_scan_types:
+                if sid not in self.skipped_1d:
+                    self.skipped_1d.append(sid)
+                skipped_scans.append(sid)
+                print(f"[LOAD SKIPPED] {sid = }: plan_type '{plan_type}' (1D scan)")
+                continue
+
+            print(f"{sid = }, processing")
+            try:
+                make_hdf(sid,
+                        wd = self.paramDict["wd"],
+                        file_overwrite_existing = True,
+                        create_each_det = True,
+                        skip_scan_types = skip_scan_types
+                        )
+            except Exception as e:
+                self.failed_scans.append(sid)
+                print(f"[LOAD FAILED] {sid = }: make_hdf raised an error ({e})")
+                continue
+
+            if os.path.exists(fname):
+                loaded_scans.append(sid)
+                print(f"[LOAD OK] pyxrf h5 for {sid = } is created")
+            else:
+                skipped_scans.append(sid)
+                print(f"[LOAD SKIPPED] {sid = }: no h5 file was produced (filtered scan type)")
+
+        print(
+            f"\nh5 load summary: {len(loaded_scans)} available, "
+            f"{len(skipped_scans)} skipped, {len(self.failed_scans)} failed"
+        )
+        if skipped_scans:
+            print(f"  skipped scans: {skipped_scans}")
+        if self.failed_scans:
+            print(f"  failed scans:  {self.failed_scans}")
+
+        fitted_scans = []
+        self.fit_failed_scans = []
         for sid in self.scan_list_requested:
-            
+
             if self.isInterruptionRequested():
                 print("Loadh5AndFitFromListLive interrupted during fitting")
                 break
-                
-            fitted_file_present = os.path.exists(os.path.join(self.paramDict["wd"],f"output_tiff_scan2D_{sid}"))
-            h5_present = os.path.exists(os.path.join(self.paramDict["wd"],f"scan2D_{sid}.h5"))
-            
-            if not fitted_file_present and h5_present:
-                try:
-                    pyxrf_batch(int(sid), 
-                                int(sid), 
-                                wd=self.paramDict["wd"], 
-                                param_file_name=self.paramDict["xrfParam"], 
-                                scaler_name=self.paramDict["norm"], 
-                                save_tiff=self.paramDict["saveXRFTiff"],
-                                save_txt = False,
-                                ignore_datafile_metadata = True,
-                                fln_quant_calib_data = self.paramDict.get("quant_calib_file",''),
-                                quant_ref_eline = self.paramDict.get("quant_calib_elem",''),
-                                interpolate_to_uniform_grid = self.paramDict.get("interpolate_to_uniform_grid",True)
-                                )
-                    print(f"{self.paramDict['wd']}/output_tiff_scan2D_{sid} created")
-                except: pass
-        
-        
-        print(f"failed to process {self.failed_scans}")
-        
-        # for sid in self.scan_list_requested:    
-        #     QtTest.QTest.qWait(500)
-        #     fitted_file_present = os.path.exists(os.path.join(self.paramDict["wd"],f"output_tiff_scan2D_{sid}"))
-        #     h5_present = os.path.exists(os.path.join(self.paramDict["wd"],f"scan2D_{sid}.h5"))
 
-        #     if self.paramDict["XRFfit"] and h5_present and not fitted_file_present:
+            sid = int(sid)
+            fitted_file_present = os.path.exists(os.path.join(self.paramDict["wd"], f"output_tiff_scan2D_{sid}"))
+            h5_present = os.path.exists(os.path.join(self.paramDict["wd"], f"scan2D_{sid}.h5"))
 
-        #         try:
+            if fitted_file_present:
+                print(f"[FIT SKIPPED] {sid = }: fit output already exists")
+                continue
 
-        #             pyxrf_batch(int(sid), 
-        #                         int(sid), 
-        #                         wd=self.paramDict["wd"], 
-        #                         param_file_name=self.paramDict["xrfParam"], 
-        #                         scaler_name=self.paramDict["norm"], 
-        #                         save_tiff=self.paramDict["saveXRFTiff"],
-        #                         save_txt = False,
-        #                         ignore_datafile_metadata = True,
-        #                         fln_quant_calib_data = self.paramDict.get("quant_calib_file",''),
-        #                         quant_ref_eline = self.paramDict.get("quant_calib_elem",'')
-        #                         )
-        #         except:
-        #             if sid not in self.failed_scans: 
-        #                 self.failed_scans.append(sid)
-        #                 self.le_failed_scans.setText(self.failed_scans)
-        #             pass
-                            
-        #print(f" emitted {self.skipped_1d = }")
-        self.skipped_1d_scans_sig.emit(self.skipped_1d)               
+            if not h5_present:
+                continue
+
+            out_dir = os.path.join(self.paramDict["wd"], f"output_tiff_scan2D_{sid}")
+            try:
+                pyxrf_batch(sid,
+                            sid,
+                            wd=self.paramDict["wd"],
+                            param_file_name=self.paramDict["xrfParam"],
+                            scaler_name=self.paramDict["norm"],
+                            save_tiff=self.paramDict["saveXRFTiff"],
+                            save_txt = False,
+                            ignore_datafile_metadata = True,
+                            fln_quant_calib_data = self.paramDict.get("quant_calib_file",''),
+                            quant_ref_eline = self.paramDict.get("quant_calib_elem",''),
+                            interpolate_to_uniform_grid = self.paramDict.get("interpolate_to_uniform_grid",True)
+                            )
+            except Exception as e:
+                self.fit_failed_scans.append(sid)
+                print(f"[FIT FAILED] {sid = }: pyxrf_batch raised an error ({e})")
+                continue
+
+            if os.path.exists(out_dir):
+                fitted_scans.append(sid)
+                print(f"[FIT OK] {out_dir} created")
+            else:
+                self.fit_failed_scans.append(sid)
+                print(f"[FIT FAILED] {sid = }: no fit output was produced")
+
+        print(
+            f"\nfit summary: {len(fitted_scans)} fitted, "
+            f"{len(self.fit_failed_scans)} failed"
+        )
+        if self.fit_failed_scans:
+            print(f"  fit failed scans: {self.fit_failed_scans}")
+
+        self.skipped_1d_scans_sig.emit(self.skipped_1d)
 
 class Loadh5AndFitForLive(QThread):
     
@@ -1454,35 +1528,57 @@ def xrf_load_and_fit_from_list(sid_list, param_dict):
     missed_scans = []
 
     for sid in sid_list:
-        
-        try:
 
-            make_hdf(int(sid),
+        sid = int(sid)
+        h5_path = os.path.join(param_dict["wd"], f"scan2D_{sid}.h5")
+
+        try:
+            make_hdf(sid,
                     wd = param_dict["wd"],
                     file_overwrite_existing = param_dict['file_overwrite_existing'],
                     create_each_det = True,
                     skip_scan_types = param_dict.get("skip_scan_types", [])
                     )
-            
-            QtTest.QTest.qWait(1000)
-            if param_dict["XRFfit"]:
-                
-                pyxrf_batch(int(sid), 
-                            int(sid), 
-                            wd=param_dict["wd"], 
-                            param_file_name=param_dict["xrfParam"], 
-                            scaler_name=param_dict["norm"], 
-                            save_tiff=param_dict["saveXRFTiff"],
-                            save_txt = False,
-                            ignore_datafile_metadata = True,
-                            fln_quant_calib_data = param_dict.get("quant_calib_file",''),
-                            quant_ref_eline = param_dict.get("quant_calib_elem",'',),
-                            interpolate_to_uniform_grid = param_dict.get("interpolate_to_uniform_grid",True)
-                            )
-        except:
-            if missed_scans is not None:
-                missed_scans.append(sid)
-                
+        except Exception as e:
+            missed_scans.append(sid)
+            print(f"[LOAD FAILED] {sid = }: make_hdf raised an error ({e})")
+            continue
+
+        if not os.path.exists(h5_path):
+            print(f"[LOAD SKIPPED] {sid = }: no h5 file was produced (filtered scan type)")
+            continue
+
+        print(f"[LOAD OK] pyxrf h5 for {sid = } is created")
+
+        QtTest.QTest.qWait(1000)
+        if not param_dict["XRFfit"]:
+            continue
+
+        out_dir = os.path.join(param_dict["wd"], f"output_tiff_scan2D_{sid}")
+        try:
+            pyxrf_batch(sid,
+                        sid,
+                        wd=param_dict["wd"],
+                        param_file_name=param_dict["xrfParam"],
+                        scaler_name=param_dict["norm"],
+                        save_tiff=param_dict["saveXRFTiff"],
+                        save_txt = False,
+                        ignore_datafile_metadata = True,
+                        fln_quant_calib_data = param_dict.get("quant_calib_file",''),
+                        quant_ref_eline = param_dict.get("quant_calib_elem",'',),
+                        interpolate_to_uniform_grid = param_dict.get("interpolate_to_uniform_grid",True)
+                        )
+        except Exception as e:
+            missed_scans.append(sid)
+            print(f"[FIT FAILED] {sid = }: pyxrf_batch raised an error ({e})")
+            continue
+
+        if os.path.exists(out_dir):
+            print(f"[FIT OK] {sid = } fitted")
+        else:
+            missed_scans.append(sid)
+            print(f"[FIT FAILED] {sid = }: no fit output was produced")
+
     return missed_scans
 
 #using for batch fitting
@@ -1505,60 +1601,132 @@ class Loadh5AndFit(QThread):
         logger.info("h5 thread started")
         QtTest.QTest.qWait(500)
 
-        #print(f"{self.paramDict['file_overwrite_existing'] = }")
-        print(f"\n Process: make hdf in batch-->xrf fitting in batch" )
-        for sid in self.paramDict["sidList"]: #filter for 1d
-            
+        skip_scan_types = self.paramDict.get("skip_scan_types", [])
+        loaded_scans = []
+        skipped_scans = []
+        self.failed_scans = []
+
+        print(f"\n Process: make hdf in batch --> xrf fitting in batch")
+        for sid in self.paramDict["sidList"]:
+
             if self.isInterruptionRequested():
                 print("Loadh5AndFit interrupted by user during h5 creation")
                 break
 
-            try:
-                hdr = db[int(sid)]
-                start_doc = hdr["start"]
-                print(f"Loading h5 data of {sid = }, plan_type: {start_doc['plan_type']}")
+            sid = int(sid)
+            h5_path = os.path.join(self.paramDict["wd"], f"scan2D_{sid}.h5")
+            overwrite = self.paramDict['file_overwrite_existing']
 
+            # Reuse an existing h5 when overwrite is off (still available for fitting)
+            if os.path.exists(h5_path) and not overwrite:
+                loaded_scans.append(sid)
+                print(f"[LOAD REUSED] {sid = }: h5 already exists, reusing (overwrite off)")
+                continue
+
+            try:
+                hdr = db[sid]
+            except Exception as e:
+                self.failed_scans.append(sid)
+                print(f"[LOAD FAILED] {sid = }: could not retrieve scan from databroker ({e})")
+                continue
+
+            if not bool(hdr.stop):
+                skipped_scans.append(sid)
+                print(f"[LOAD SKIPPED] {sid = }: scan has no stop document (incomplete/aborted)")
+                continue
+
+            plan_type = hdr["start"].get("plan_type", "unknown")
+            if plan_type in skip_scan_types:
+                skipped_scans.append(sid)
+                print(f"[LOAD SKIPPED] {sid = }: plan_type '{plan_type}' is in skip list")
+                continue
+
+            print(f"Loading h5 data of {sid = }, plan_type: {plan_type}")
+            try:
                 make_hdf(
-                    int(sid), 
+                    sid,
                     wd = self.paramDict["wd"],
-                    file_overwrite_existing = self.paramDict['file_overwrite_existing'],
+                    file_overwrite_existing = overwrite,
                     create_each_det = True,
-                    skip_scan_types = self.paramDict.get("skip_scan_types", [])
+                    skip_scan_types = skip_scan_types
                     )
-                
-                print(f"Pyxrf h5 for {sid = } is created ")
-                
-            except:
-                if sid not in self.failed_scans: 
-                    self.failed_scans.append(sid)
-                    #self.le_failed_scans.setText(self.failed_scans)
-                pass
+            except Exception as e:
+                self.failed_scans.append(sid)
+                print(f"[LOAD FAILED] {sid = }: make_hdf raised an error ({e})")
+                QtTest.QTest.qWait(1000)
+                continue
+
+            if os.path.exists(h5_path):
+                loaded_scans.append(sid)
+                print(f"[LOAD OK] pyxrf h5 for {sid = } is created")
+            else:
+                skipped_scans.append(sid)
+                print(f"[LOAD SKIPPED] {sid = }: no h5 file was produced (filtered scan type)")
             QtTest.QTest.qWait(1000)
+
+        print(
+            f"\nh5 load summary: {len(loaded_scans)} available (created/reused), "
+            f"{len(skipped_scans)} skipped, {len(self.failed_scans)} failed"
+        )
+        if skipped_scans:
+            print(f"  skipped scans: {skipped_scans}")
+        if self.failed_scans:
+            print(f"  failed scans:  {self.failed_scans}")
 
         if self.isInterruptionRequested():
             print("Loadh5AndFit interrupted before batch fitting")
             return
 
-        try:
-            print(f"interpolation marker: {self.paramDict.get('interpolate_to_uniform_grid',True)}")
+        if not self.paramDict.get("XRFfit", True):
+            print("XRF Fitting not requested; h5 creation complete, skipping fitting")
+            return
 
-            pyxrf_batch(int(self.paramDict["sidList"][0]), 
-                        int(self.paramDict["sidList"][-1]), 
-                        wd=self.paramDict["wd"], 
-                        param_file_name=self.paramDict["xrfParam"], 
-                        scaler_name=self.paramDict["norm"], 
-                        save_tiff=self.paramDict["saveXRFTiff"],
-                        save_txt = False,
-                        ignore_datafile_metadata = True,
-                        fln_quant_calib_data = self.paramDict.get("quant_calib_file",''),
-                        quant_ref_eline = self.paramDict.get("quant_calib_elem",''),
-                        interpolate_to_uniform_grid = self.paramDict.get("interpolate_to_uniform_grid",True)
-                        )
-            
-            print(f"Batch fitting from {self.paramDict['sidList'][0]} to {self.paramDict['sidList'][-1]} is done")
-        
+        if not loaded_scans:
+            print("No h5 files available to fit; nothing to do")
+            return
 
-        except Exception as e: print("Error: "+str(e))
+        print(f"\ninterpolation marker: {self.paramDict.get('interpolate_to_uniform_grid',True)}")
+
+        fitted_scans = []
+        self.fit_failed_scans = []
+        for sid in loaded_scans:
+
+            if self.isInterruptionRequested():
+                print("Loadh5AndFit interrupted during batch fitting")
+                break
+
+            out_dir = os.path.join(self.paramDict["wd"], f"output_tiff_scan2D_{sid}")
+            try:
+                pyxrf_batch(sid,
+                            sid,
+                            wd=self.paramDict["wd"],
+                            param_file_name=self.paramDict["xrfParam"],
+                            scaler_name=self.paramDict["norm"],
+                            save_tiff=self.paramDict["saveXRFTiff"],
+                            save_txt = False,
+                            ignore_datafile_metadata = True,
+                            fln_quant_calib_data = self.paramDict.get("quant_calib_file",''),
+                            quant_ref_eline = self.paramDict.get("quant_calib_elem",''),
+                            interpolate_to_uniform_grid = self.paramDict.get("interpolate_to_uniform_grid",True)
+                            )
+            except Exception as e:
+                self.fit_failed_scans.append(sid)
+                print(f"[FIT FAILED] {sid = }: pyxrf_batch raised an error ({e})")
+                continue
+
+            if os.path.exists(out_dir):
+                fitted_scans.append(sid)
+                print(f"[FIT OK] {sid = } fitted")
+            else:
+                self.fit_failed_scans.append(sid)
+                print(f"[FIT FAILED] {sid = }: no fit output was produced")
+
+        print(
+            f"\nfit summary: {len(fitted_scans)} fitted, "
+            f"{len(self.fit_failed_scans)} failed"
+        )
+        if self.fit_failed_scans:
+            print(f"  fit failed scans: {self.fit_failed_scans}")
 
         # for sid in self.paramDict["sidList"]:
         #     h5_present = os.path.exists(os.path.join(self.paramDict["wd"],f"scan2D_{sid}.h5"))
@@ -1594,21 +1762,64 @@ class xrfBatchThread(QThread):
         self.paramDict = paramDict
 
     def run(self):
-        sid_i = self.paramDict["sid_i"]
-        sid_f = self.paramDict["sid_f"]
+        # Configure dask to use threaded scheduler to avoid multiprocessing issues in QThread
+        dask.config.set(scheduler='threads')
 
+        sid_list = self.paramDict.get("sidList", list(range(int(self.paramDict["sid_i"]),
+                                                             int(self.paramDict["sid_f"]) + 1)))
 
-        pyxrf_batch(self.paramDict["sid_i"], 
-            self.paramDict["sid_f"], 
-            wd=self.paramDict["wd"], 
-            param_file_name=self.paramDict["xrfParam"], 
-            scaler_name=self.paramDict["norm"], 
-            save_tiff=self.paramDict["saveXRFTiff"],
-            save_txt = False,
-            ignore_datafile_metadata = True,
-            fln_quant_calib_data = self.paramDict.get("quant_calib_file", ''),
-            quant_ref_eline = self.paramDict.get("quant_calib_elem", '')
-            )
+        fitted_scans = []
+        skipped_scans = []
+        fit_failed_scans = []
+
+        for sid in sid_list:
+
+            if self.isInterruptionRequested():
+                print("xrfBatchThread interrupted by user")
+                break
+
+            sid = int(sid)
+            h5_present = os.path.exists(os.path.join(self.paramDict["wd"], f"scan2D_{sid}.h5"))
+            out_dir = os.path.join(self.paramDict["wd"], f"output_tiff_scan2D_{sid}")
+
+            if not h5_present:
+                skipped_scans.append(sid)
+                print(f"[FIT SKIPPED] {sid = }: no h5 file found to fit")
+                continue
+
+            try:
+                pyxrf_batch(sid,
+                            sid,
+                            wd=self.paramDict["wd"],
+                            param_file_name=self.paramDict["xrfParam"],
+                            scaler_name=self.paramDict["norm"],
+                            save_tiff=self.paramDict["saveXRFTiff"],
+                            save_txt = False,
+                            ignore_datafile_metadata = True,
+                            fln_quant_calib_data = self.paramDict.get("quant_calib_file", ''),
+                            quant_ref_eline = self.paramDict.get("quant_calib_elem", ''),
+                            interpolate_to_uniform_grid = self.paramDict.get("interpolate_to_uniform_grid", True)
+                            )
+            except Exception as e:
+                fit_failed_scans.append(sid)
+                print(f"[FIT FAILED] {sid = }: pyxrf_batch raised an error ({e})")
+                continue
+
+            if os.path.exists(out_dir):
+                fitted_scans.append(sid)
+                print(f"[FIT OK] {sid = } fitted")
+            else:
+                fit_failed_scans.append(sid)
+                print(f"[FIT FAILED] {sid = }: no fit output was produced")
+
+        print(
+            f"\nfit summary: {len(fitted_scans)} fitted, "
+            f"{len(skipped_scans)} skipped, {len(fit_failed_scans)} failed"
+        )
+        if skipped_scans:
+            print(f"  skipped scans (no h5): {skipped_scans}")
+        if fit_failed_scans:
+            print(f"  fit failed scans: {fit_failed_scans}")
         
 class TrackingFileToScanNumerThreadLive(QThread):
 
