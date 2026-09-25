@@ -1200,6 +1200,27 @@ class XANESBatchProcessing(QThread):
         
         print("XANES batch processing completed or stopped")
 
+
+def index_workdir_files(wd):
+    """Snapshot existing pyxrf products in `wd` with a single directory scan.
+
+    Returns (h5_files, output_dirs) as name sets, so callers can test for an
+    existing scan2D_<sid>.h5 or output_tiff_scan2D_<sid> via O(1) set lookups
+    instead of one os.path.exists() stat per scan.
+    """
+    h5_files = set()
+    output_dirs = set()
+    if os.path.isdir(wd):
+        with os.scandir(wd) as entries:
+            for entry in entries:
+                name = entry.name
+                if name.startswith("scan2D_") and name.endswith(".h5"):
+                    h5_files.add(name)
+                elif name.startswith("output_tiff_scan2D_"):
+                    output_dirs.add(name)
+    return h5_files, output_dirs
+
+
 #using for track file mode
 class Loadh5AndFitFromList(QThread):
 
@@ -1216,9 +1237,13 @@ class Loadh5AndFitFromList(QThread):
         dask.config.set(scheduler='threads')
 
         skip_scan_types = self.paramDict.get("skip_scan_types", [])
+        wd = self.paramDict["wd"]
         loaded_scans = []
         skipped_scans = []
         self.failed_scans = []
+
+        # One directory scan up front instead of a stat per scan
+        existing_h5, _existing_out = index_workdir_files(wd)
 
         for sid in self.scan_list_requested:
 
@@ -1227,9 +1252,10 @@ class Loadh5AndFitFromList(QThread):
                 break
 
             sid = int(sid)
-            fname = os.path.join(self.paramDict["wd"], f"scan2D_{sid}.h5")
+            h5_name = f"scan2D_{sid}.h5"
+            fname = os.path.join(wd, h5_name)
 
-            if os.path.exists(fname):
+            if h5_name in existing_h5:
                 loaded_scans.append(sid)
                 print(f"[LOAD SKIPPED] {sid = }: h5 file already exists")
                 continue
@@ -1255,7 +1281,7 @@ class Loadh5AndFitFromList(QThread):
             print(f"{sid = }, processing")
             try:
                 make_hdf(sid,
-                        wd = self.paramDict["wd"],
+                        wd = wd,
                         file_overwrite_existing = False,
                         create_each_det = True,
                         skip_scan_types = skip_scan_types
@@ -1267,6 +1293,7 @@ class Loadh5AndFitFromList(QThread):
 
             if os.path.exists(fname):
                 loaded_scans.append(sid)
+                existing_h5.add(h5_name)
                 print(f"[LOAD OK] pyxrf h5 for {sid = } is created")
             else:
                 skipped_scans.append(sid)
@@ -1375,9 +1402,13 @@ class Loadh5AndFitFromListLive(QThread):
         dask.config.set(scheduler='threads')
 
         skip_scan_types = self.paramDict.get("skip_scan_types", [])
+        wd = self.paramDict["wd"]
         loaded_scans = []
         skipped_scans = []
         self.failed_scans = []
+
+        # One directory scan up front instead of a stat per scan
+        existing_h5, existing_out = index_workdir_files(wd)
 
         for sid in self.scan_list_requested:
 
@@ -1386,9 +1417,10 @@ class Loadh5AndFitFromListLive(QThread):
                 break
 
             sid = int(sid)
-            fname = os.path.join(self.paramDict["wd"], f"scan2D_{sid}.h5")
+            h5_name = f"scan2D_{sid}.h5"
+            fname = os.path.join(wd, h5_name)
 
-            if os.path.exists(fname):
+            if h5_name in existing_h5:
                 loaded_scans.append(sid)
                 print(f"[LOAD SKIPPED] {sid = }: h5 file already exists")
                 continue
@@ -1416,7 +1448,7 @@ class Loadh5AndFitFromListLive(QThread):
             print(f"{sid = }, processing")
             try:
                 make_hdf(sid,
-                        wd = self.paramDict["wd"],
+                        wd = wd,
                         file_overwrite_existing = True,
                         create_each_det = True,
                         skip_scan_types = skip_scan_types
@@ -1428,6 +1460,7 @@ class Loadh5AndFitFromListLive(QThread):
 
             if os.path.exists(fname):
                 loaded_scans.append(sid)
+                existing_h5.add(h5_name)
                 print(f"[LOAD OK] pyxrf h5 for {sid = } is created")
             else:
                 skipped_scans.append(sid)
@@ -1444,28 +1477,24 @@ class Loadh5AndFitFromListLive(QThread):
 
         fitted_scans = []
         self.fit_failed_scans = []
-        for sid in self.scan_list_requested:
+        # Fit only the scans that produced/have an h5 (already filtered above)
+        for sid in loaded_scans:
 
             if self.isInterruptionRequested():
                 print("Loadh5AndFitFromListLive interrupted during fitting")
                 break
 
-            sid = int(sid)
-            fitted_file_present = os.path.exists(os.path.join(self.paramDict["wd"], f"output_tiff_scan2D_{sid}"))
-            h5_present = os.path.exists(os.path.join(self.paramDict["wd"], f"scan2D_{sid}.h5"))
+            out_name = f"output_tiff_scan2D_{sid}"
+            out_dir = os.path.join(wd, out_name)
 
-            if fitted_file_present:
+            if out_name in existing_out:
                 print(f"[FIT SKIPPED] {sid = }: fit output already exists")
                 continue
 
-            if not h5_present:
-                continue
-
-            out_dir = os.path.join(self.paramDict["wd"], f"output_tiff_scan2D_{sid}")
             try:
                 pyxrf_batch(sid,
                             sid,
-                            wd=self.paramDict["wd"],
+                            wd=wd,
                             param_file_name=self.paramDict["xrfParam"],
                             scaler_name=self.paramDict["norm"],
                             save_tiff=self.paramDict["saveXRFTiff"],
@@ -1482,6 +1511,7 @@ class Loadh5AndFitFromListLive(QThread):
 
             if os.path.exists(out_dir):
                 fitted_scans.append(sid)
+                existing_out.add(out_name)
                 print(f"[FIT OK] {out_dir} created")
             else:
                 self.fit_failed_scans.append(sid)
@@ -1602,9 +1632,14 @@ class Loadh5AndFit(QThread):
         QtTest.QTest.qWait(500)
 
         skip_scan_types = self.paramDict.get("skip_scan_types", [])
+        overwrite = self.paramDict['file_overwrite_existing']
+        wd = self.paramDict["wd"]
         loaded_scans = []
         skipped_scans = []
         self.failed_scans = []
+
+        # One directory scan up front instead of a stat per scan
+        existing_h5, _existing_out = index_workdir_files(wd)
 
         print(f"\n Process: make hdf in batch --> xrf fitting in batch")
         for sid in self.paramDict["sidList"]:
@@ -1614,11 +1649,11 @@ class Loadh5AndFit(QThread):
                 break
 
             sid = int(sid)
-            h5_path = os.path.join(self.paramDict["wd"], f"scan2D_{sid}.h5")
-            overwrite = self.paramDict['file_overwrite_existing']
+            h5_name = f"scan2D_{sid}.h5"
+            h5_path = os.path.join(wd, h5_name)
 
             # Reuse an existing h5 when overwrite is off (still available for fitting)
-            if os.path.exists(h5_path) and not overwrite:
+            if h5_name in existing_h5 and not overwrite:
                 loaded_scans.append(sid)
                 print(f"[LOAD REUSED] {sid = }: h5 already exists, reusing (overwrite off)")
                 continue
@@ -1645,7 +1680,7 @@ class Loadh5AndFit(QThread):
             try:
                 make_hdf(
                     sid,
-                    wd = self.paramDict["wd"],
+                    wd = wd,
                     file_overwrite_existing = overwrite,
                     create_each_det = True,
                     skip_scan_types = skip_scan_types
@@ -1658,6 +1693,7 @@ class Loadh5AndFit(QThread):
 
             if os.path.exists(h5_path):
                 loaded_scans.append(sid)
+                existing_h5.add(h5_name)
                 print(f"[LOAD OK] pyxrf h5 for {sid = } is created")
             else:
                 skipped_scans.append(sid)
@@ -1765,8 +1801,12 @@ class xrfBatchThread(QThread):
         # Configure dask to use threaded scheduler to avoid multiprocessing issues in QThread
         dask.config.set(scheduler='threads')
 
+        wd = self.paramDict["wd"]
         sid_list = self.paramDict.get("sidList", list(range(int(self.paramDict["sid_i"]),
                                                              int(self.paramDict["sid_f"]) + 1)))
+
+        # One directory scan up front instead of a stat per scan
+        existing_h5, _existing_out = index_workdir_files(wd)
 
         fitted_scans = []
         skipped_scans = []
@@ -1779,10 +1819,9 @@ class xrfBatchThread(QThread):
                 break
 
             sid = int(sid)
-            h5_present = os.path.exists(os.path.join(self.paramDict["wd"], f"scan2D_{sid}.h5"))
-            out_dir = os.path.join(self.paramDict["wd"], f"output_tiff_scan2D_{sid}")
+            out_dir = os.path.join(wd, f"output_tiff_scan2D_{sid}")
 
-            if not h5_present:
+            if f"scan2D_{sid}.h5" not in existing_h5:
                 skipped_scans.append(sid)
                 print(f"[FIT SKIPPED] {sid = }: no h5 file found to fit")
                 continue
@@ -1790,7 +1829,7 @@ class xrfBatchThread(QThread):
             try:
                 pyxrf_batch(sid,
                             sid,
-                            wd=self.paramDict["wd"],
+                            wd=wd,
                             param_file_name=self.paramDict["xrfParam"],
                             scaler_name=self.paramDict["norm"],
                             save_tiff=self.paramDict["saveXRFTiff"],
